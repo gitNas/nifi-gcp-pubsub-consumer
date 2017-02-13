@@ -72,6 +72,13 @@ public class GcpPubsubConsumer extends AbstractProcessor {
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
     
+    public static final PropertyDescriptor pullCountProperty = new PropertyDescriptor.Builder().name("Pull Count")
+            .description("Number of messages to pull at request")
+            .required(true)
+            .defaultValue("10")
+            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .build();
+    
     static final Relationship REL_SUCCESS = new Relationship.Builder()
             .name("success")
             .description("FlowFiles received from Pubsub.")
@@ -95,6 +102,7 @@ public class GcpPubsubConsumer extends AbstractProcessor {
         descriptors.add(topicProperty);
         descriptors.add(projectIdProperty);
         descriptors.add(clientNameWithDefault);
+        descriptors.add(pullCountProperty);
         this.descriptors = Collections.unmodifiableList(descriptors);
 
         final Set<Relationship> relationships = new HashSet<Relationship>();
@@ -114,11 +122,6 @@ public class GcpPubsubConsumer extends AbstractProcessor {
 
     @OnScheduled
     public void onScheduled(final ProcessContext context) {
-
-    }
-
-    @Override
-    public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
         if(pubsub == null) {
             PubSubOptions.Builder opts = PubSubOptions.newBuilder()
                     .setProjectId(context.getProperty(projectIdProperty).getValue());
@@ -157,12 +160,24 @@ public class GcpPubsubConsumer extends AbstractProcessor {
             
             getLogger().info("subscription: " + subName);
         }
+    }
+
+    @Override
+    public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
+        int pullCount = context.getProperty(pullCountProperty).asInteger();
         
-        Iterator<ReceivedMessage> messages = sub.pull(10);
+        if(pullCount <= 0) {
+            pullCount = 10;
+            
+            getLogger().info("PullCount is not valid(" + pullCount + ") defaulting to 10");
+        }
+        
+        Iterator<ReceivedMessage> messages = sub.pull(pullCount);
         while(messages.hasNext()) {
             final ReceivedMessage msg = messages.next();
             
             FlowFile flow = session.create();
+            
             flow = session.write(flow, new OutputStreamCallback() {
                 @Override
                 public void process(OutputStream out) throws IOException {
