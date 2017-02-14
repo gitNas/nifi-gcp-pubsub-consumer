@@ -24,6 +24,7 @@ import org.apache.nifi.annotation.documentation.SeeAlso;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.annotation.lifecycle.OnScheduled;
 import org.apache.nifi.components.PropertyDescriptor;
+import org.apache.nifi.components.PropertyValue;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.ProcessContext;
@@ -126,9 +127,10 @@ public class GcpPubsubConsumer extends AbstractProcessor {
             PubSubOptions.Builder opts = PubSubOptions.newBuilder()
                     .setProjectId(context.getProperty(projectIdProperty).getValue());
             
-            if(context.getProperty(authProperty) != null) {
+            PropertyValue auth = context.getProperty(authProperty);
+            if(auth.isSet()) {
                 try {
-                    opts = opts.setCredentials(ServiceAccountCredentials.fromStream(new ByteArrayInputStream(context.getProperty(authProperty).getValue().getBytes())));
+                    opts = opts.setCredentials(ServiceAccountCredentials.fromStream(new ByteArrayInputStream(auth.getValue().getBytes())));
                 } catch (IOException ex) {
                     throw new ProcessException("Error setting credentials", ex);
                 }
